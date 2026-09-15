@@ -89,13 +89,31 @@ function render(data) {
     needCards.map(card).join("");
 
   const board = document.getElementById("board");
-  board.innerHTML = COLUMNS.map((col) => {
+  const lanes = COLUMNS.map((col) => {
     const cards = col.states.flatMap(byState);
     return `<section class="col${col.need ? " need" : ""}">
       <h2>${esc(col.label)} <span class="n">${cards.length}</span></h2>
       ${cards.map(card).join("") || '<div class="why">—</div>'}
     </section>`;
-  }).join("");
+  });
+
+  // PR4b (plan 2.6) - a cross-cutting "who is driving this right now" lane per
+  // ACTIVE supervisor, appended after the state columns. These cards also appear
+  // in their state column above: this is a lens, not a re-bucketing. Stale claims
+  // are excluded so an abandoned claim is never read as live supervision.
+  const EYE = String.fromCodePoint(0x1F440);
+  const supName = (h) =>
+    h.supervised_by ? String(h.supervised_by.supervisor || "").split("(")[0].trim() : "";
+  const liveSup = hs.filter((h) => h.supervised_by && h.supervised_by.stale !== true);
+  const supNames = [...new Set(liveSup.map(supName).filter(Boolean))];
+  for (const who of supNames) {
+    const cards = liveSup.filter((h) => supName(h) === who);
+    lanes.push(`<section class="col sup-lane">
+      <h2>${EYE} ${esc(who)} supervised <span class="n">${cards.length}</span></h2>
+      ${cards.map(card).join("")}
+    </section>`);
+  }
+  board.innerHTML = lanes.join("");
 
   const foot = hs.filter((h) => FOOTER_STATES.includes(h.state));
   document.getElementById("done").innerHTML = foot.length
