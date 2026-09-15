@@ -106,14 +106,23 @@ function render(data) {
     h.supervised_by ? String(h.supervised_by.supervisor || "").split("(")[0].trim() : "";
   const liveSup = hs.filter((h) => h.supervised_by && h.supervised_by.stale !== true);
   const supNames = [...new Set(liveSup.map(supName).filter(Boolean))];
-  for (const who of supNames) {
+  const supLanes = supNames.map((who) => {
     const cards = liveSup.filter((h) => supName(h) === who);
-    lanes.push(`<section class="col sup-lane">
+    return `<section class="col sup-lane">
       <h2>${EYE} ${esc(who)} supervised <span class="n">${cards.length}</span></h2>
       ${cards.map(card).join("")}
-    </section>`);
-  }
-  board.innerHTML = lanes.join("");
+    </section>`;
+  });
+  board.innerHTML = lanes.concat(supLanes).join("");
+
+  // Dedicated "Envoy supervised" tab: the same lanes, alone. Reset/absent render an
+  // all-clear so the tab never looks broken when no supervisor is active.
+  document.getElementById("supervised").innerHTML = supLanes.length
+    ? supLanes.join("")
+    : `<div class="allclear"><div class="check">\u2713</div>
+        <h2>No active supervision</h2>
+        <p>No handoff currently has a live supervisor claim.</p>
+      </div>`;
 
   const foot = hs.filter((h) => FOOTER_STATES.includes(h.state));
   document.getElementById("done").innerHTML = foot.length
@@ -123,15 +132,24 @@ function render(data) {
     : "";
 }
 
-function show(which) {
-  const needs = which === "needs";
-  document.getElementById("needs").hidden = !needs;
-  document.getElementById("board").hidden = needs;
-  document.getElementById("allclear").hidden = !needs || !document.getElementById("allclear").dataset.empty;
-  document.getElementById("tab-needs").classList.toggle("active", needs);
-  document.getElementById("tab-board").classList.toggle("active", !needs);
-  document.getElementById("tab-needs").setAttribute("aria-selected", needs);
-  document.getElementById("tab-board").setAttribute("aria-selected", !needs);
+const VIEWS = { needs: "needs", board: "board", sup: "supervised" };
+
+function show(which, opts = {}) {
+  if (!VIEWS[which]) which = "needs";
+  for (const [key, id] of Object.entries(VIEWS)) {
+    const on = key === which;
+    document.getElementById(id).hidden = !on;
+    const tab = document.getElementById("tab-" + key);
+    if (tab) { tab.classList.toggle("active", on); tab.setAttribute("aria-selected", on); }
+  }
+  // The all-clear replaces the Needs-You list only when there is nothing to show.
+  document.getElementById("allclear").hidden =
+    which !== "needs" || !document.getElementById("allclear").dataset.empty;
+  // Reflect the active view in the URL (needs = clean URL) so it survives refresh.
+  const norm = which === "needs" ? "" : which;
+  if (!opts.noHistory && viewFromUrl() !== norm) {
+    history.pushState({ view: norm }, "", viewUrl(norm));
+  }
 }
 
 async function fetchFirst(urls) {
@@ -146,16 +164,30 @@ async function fetchFirst(urls) {
 }
 
 const SPEC_PARAM = "spec";
+const VIEW_PARAM = "view";
+
+// Mutate only the params we own, so ?spec and ?view coexist in one URL.
+function pageUrl(mut) {
+  const u = new URL(location.href);
+  mut(u.searchParams);
+  return u.pathname + u.search;
+}
 
 function specUrl(path) {
-  const u = new URL(location.href);
-  if (path) u.searchParams.set(SPEC_PARAM, path);
-  else u.searchParams.delete(SPEC_PARAM);
-  return u.pathname + u.search;
+  return pageUrl((sp) => (path ? sp.set(SPEC_PARAM, path) : sp.delete(SPEC_PARAM)));
 }
 
 function specFromUrl() {
   return new URL(location.href).searchParams.get(SPEC_PARAM) || "";
+}
+
+function viewUrl(view) {
+  return pageUrl((sp) => (view ? sp.set(VIEW_PARAM, view) : sp.delete(VIEW_PARAM)));
+}
+
+function viewFromUrl() {
+  const v = new URL(location.href).searchParams.get(VIEW_PARAM) || "";
+  return VIEWS[v] ? v : "";
 }
 
 async function openSpec(path, opts = {}) {
@@ -190,6 +222,7 @@ window.addEventListener("popstate", () => {
   const dlg = document.getElementById("spec");
   if (p) openSpec(p, { noHistory: true });
   else if (dlg.open) dlg.close();
+  show(viewFromUrl() || "needs", { noHistory: true });
 });
 // --- copy a link to the open spec (with a fallback for non-secure/http contexts) ---
 async function copyText(txt) {
@@ -239,6 +272,7 @@ document.getElementById("copy-link").addEventListener("click", async (ev) => {
 
 document.getElementById("tab-needs").addEventListener("click", () => show("needs"));
 document.getElementById("tab-board").addEventListener("click", () => show("board"));
+document.getElementById("tab-sup").addEventListener("click", () => show("sup"));
 
 (async () => {
   try {
@@ -248,7 +282,7 @@ document.getElementById("tab-board").addEventListener("click", () => show("board
       (h) => h.state === "blocked_on_human" || h.state === "human_uat_ready");
     document.getElementById("allclear").dataset.empty = empty ? "1" : "";
     render(data);
-    show("needs"); // default landing view is "Needs You"
+    show(viewFromUrl() || "needs", { noHistory: true }); // ?view= deep link, else Needs You
     const deepSpec = specFromUrl();
     if (deepSpec) openSpec(deepSpec, { noHistory: true }); // deep link: ?spec=plans/FOO.md
   } catch (e) {
