@@ -18,6 +18,10 @@ code{background:#f0f0f0;padding:.15rem .35rem;border-radius:3px;
 .brand{display:flex;align-items:center;gap:.6rem}
 .brand-logo{height:2rem;width:auto;display:block}
 .brand h1{font-size:1.05rem;margin:0;font-weight:600;letter-spacing:.01em;color:var(--ink)}
+/* [hidden] must beat display rules such as .board{display:grid}: author styles
+   outrank the UA [hidden]{display:none}, so without this the hidden attribute is
+   defeated and the view tabs silently do nothing (all sections stay painted). */
+[hidden]{display:none!important}
 .viewswitch{display:flex;gap:.4rem}
 .tab{background:var(--page);border:1px solid var(--line);color:var(--ink);padding:.35rem .8rem;
   border-radius:8px;cursor:pointer;font-size:.85rem;font-family:inherit;transition:background-color .2s,color .2s,border-color .2s}
