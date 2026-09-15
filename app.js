@@ -191,6 +191,52 @@ window.addEventListener("popstate", () => {
   if (p) openSpec(p, { noHistory: true });
   else if (dlg.open) dlg.close();
 });
+// --- copy a link to the open spec (with a fallback for non-secure/http contexts) ---
+async function copyText(txt) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  } catch (e) { /* fall through to the legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = txt;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+
+function flashCopy(btn, ok) {
+  const lbl = btn.querySelector(".lbl");
+  if (lbl) {
+    if (!btn.dataset.label) btn.dataset.label = lbl.textContent;
+    lbl.textContent = ok ? "Copied" : "Copy failed";
+  }
+  btn.classList.toggle("ok", ok);
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => {
+    if (lbl && btn.dataset.label) lbl.textContent = btn.dataset.label;
+    btn.classList.remove("ok");
+  }, 1400);
+}
+
+document.getElementById("copy-link").addEventListener("click", async (ev) => {
+  ev.preventDefault();
+  const btn = ev.currentTarget;
+  const ok = await copyText(location.href);   // href already carries ?spec=... when open
+  flashCopy(btn, ok);
+  if (!ok) { try { window.prompt("Copy this link:", location.href); } catch (e) {} }
+});
+
 document.getElementById("tab-needs").addEventListener("click", () => show("needs"));
 document.getElementById("tab-board").addEventListener("click", () => show("board"));
 

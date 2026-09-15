@@ -36,9 +36,15 @@
 <dialog id="spec">
   <div class="specbar">
     <span id="spec-title">Spec</span>
-    <form method="dialog"><button class="x" aria-label="Close">✕</button></form>
+    <div class="bar-actions">
+      <button id="copy-link" class="copy" type="button"
+              aria-label="Copy a link to this spec" title="Copy a link to this spec">
+        <span class="ico" aria-hidden="true">&#x29C9;</span><span class="lbl">Copy URL</span>
+      </button>
+      <form method="dialog"><button class="x" aria-label="Close">&#x2715;</button></form>
+    </div>
   </div>
-  <pre id="spec-body">Loading…</pre>
+  <pre id="spec-body">Loading&#x2026;</pre>
 </dialog>
 
 <script src="app.js"></script>
