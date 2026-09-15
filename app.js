@@ -145,11 +145,28 @@ async function fetchFirst(urls) {
   throw lastErr || new Error("all sources failed");
 }
 
-async function openSpec(path) {
+const SPEC_PARAM = "spec";
+
+function specUrl(path) {
+  const u = new URL(location.href);
+  if (path) u.searchParams.set(SPEC_PARAM, path);
+  else u.searchParams.delete(SPEC_PARAM);
+  return u.pathname + u.search;
+}
+
+function specFromUrl() {
+  return new URL(location.href).searchParams.get(SPEC_PARAM) || "";
+}
+
+async function openSpec(path, opts = {}) {
   const dlg = document.getElementById("spec");
   document.getElementById("spec-title").textContent = path;
-  document.getElementById("spec-body").textContent = "Loading…";
-  dlg.showModal();
+  document.getElementById("spec-body").textContent = "Loading\u2026";
+  if (!dlg.open) dlg.showModal();
+  // Reflect the open spec in the URL so it is shareable and survives refresh.
+  if (!opts.noHistory && specFromUrl() !== path) {
+    history.pushState({ spec: path }, "", specUrl(path));
+  }
   try {
     document.getElementById("spec-body").textContent = await fetchFirst(SPEC_SOURCES(path));
   } catch (e) {
@@ -160,6 +177,19 @@ async function openSpec(path) {
 document.addEventListener("click", (ev) => {
   const a = ev.target.closest("[data-spec]");
   if (a) { ev.preventDefault(); openSpec(a.dataset.spec); }
+});
+
+// Closing the dialog (Esc / backdrop / close button) clears ?spec from the URL.
+document.getElementById("spec").addEventListener("close", () => {
+  if (specFromUrl()) history.replaceState({}, "", specUrl(""));
+});
+
+// Browser back/forward: reopen or close the dialog to match the URL.
+window.addEventListener("popstate", () => {
+  const p = specFromUrl();
+  const dlg = document.getElementById("spec");
+  if (p) openSpec(p, { noHistory: true });
+  else if (dlg.open) dlg.close();
 });
 document.getElementById("tab-needs").addEventListener("click", () => show("needs"));
 document.getElementById("tab-board").addEventListener("click", () => show("board"));
@@ -173,6 +203,8 @@ document.getElementById("tab-board").addEventListener("click", () => show("board
     document.getElementById("allclear").dataset.empty = empty ? "1" : "";
     render(data);
     show("needs"); // default landing view is "Needs You"
+    const deepSpec = specFromUrl();
+    if (deepSpec) openSpec(deepSpec, { noHistory: true }); // deep link: ?spec=plans/FOO.md
   } catch (e) {
     document.getElementById("meta").textContent = "Failed to load index.json: " + e.message;
   }
