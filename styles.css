@@ -44,6 +44,9 @@ main{padding:1.1rem;max-width:1400px;margin:0 auto}
 .card h3{margin:0 0 .35rem;font-size:.9rem;color:var(--ink);font-weight:600}
 .card .state{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;
   color:var(--muted-2);margin-bottom:.3rem}
+.card .sup{display:inline-block;font-size:.72rem;color:var(--green-dk);background:#eef7ee;
+  border:1px solid var(--green);border-radius:8px;padding:.1rem .45rem;margin:0 0 .35rem;cursor:help}
+.card .sup.stale{color:var(--muted-2);background:#f0f0f0;border-color:var(--line)}
 .card .why{font-size:.8rem;color:var(--muted);margin:.25rem 0 .5rem}
 .card .links{display:flex;gap:.5rem;flex-wrap:wrap}
 .card a{font-size:.78rem;text-decoration:none;padding:.22rem .55rem;border-radius:8px;
