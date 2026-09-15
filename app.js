@@ -44,6 +44,17 @@ function dcUrl(h) {
   return null;
 }
 
+function supBadge(h) {
+  const s = h.supervised_by;
+  if (!s) return "";
+  const EYE = String.fromCodePoint(0x1F440);
+  const who = s.supervisor ? String(s.supervisor).split("(")[0].trim() : "supervisor";
+  const stale = s.stale === true;
+  const age = Number.isFinite(s.age_minutes) ? ` (${s.age_minutes} min)` : "";
+  const note = s.note ? ` title="${esc(s.note)}"` : "";
+  return `<div class="sup${stale ? " stale" : ""}"${note}>${EYE} ${esc(who)} — ${stale ? "stale" : "active"}${esc(age)}</div>`;
+}
+
 function card(h) {
   const need = h.state === "blocked_on_human" || h.state === "human_uat_ready";
   const links = [];
@@ -55,6 +66,7 @@ function card(h) {
   if (dc) links.push(`<a href="${esc(dc)}" target="_blank" rel="noopener">Discord ↗</a>`);
   return `<article class="card${need ? " need" : ""}">
     <div class="state">${esc(h.state)}</div>
+    ${supBadge(h)}
     <h3>${esc(strip(h.title))}</h3>
     <div class="why">${esc(strip(h.status_raw))}</div>
     <div class="links">${links.join("")}</div>
@@ -68,7 +80,7 @@ function render(data) {
   const needCards = [...byState("blocked_on_human"), ...byState("human_uat_ready")];
 
   document.getElementById("meta").textContent =
-    `${hs.length} handoffs · ${needCards.length} need you · updated ${data.generated_at || "?"}`;
+    `${hs.length} handoffs · ${needCards.length} need you · ${hs.filter((h) => h.supervised_by).length} supervising · updated ${data.generated_at || "?"}`;
 
   const ac = document.getElementById("allclear");
   ac.hidden = needCards.length !== 0;
