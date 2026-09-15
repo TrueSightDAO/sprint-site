@@ -61,15 +61,27 @@ main{padding:1.1rem;max-width:1400px;margin:0 auto}
 .donefoot ul{margin:.5rem 0 0;padding-left:1.1rem}
 dialog#spec{width:min(900px,92vw);height:min(80vh,900px);border:1px solid var(--line);border-radius:8px;
   padding:0;box-shadow:0 4px 20px rgba(0,0,0,.18)}
-.specbar{display:flex;justify-content:space-between;align-items:center;background:var(--card);color:var(--ink);
+/* flex column so the body always fills whatever the bar height turns out to be */
+dialog#spec[open]{display:flex;flex-direction:column}
+.specbar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;background:var(--card);color:var(--ink);
   padding:.5rem .8rem;border-bottom:2px solid var(--accent)}
-.specbar span{font-size:.85rem;font-weight:600}
-.x{background:transparent;border:0;color:var(--muted);font-size:1rem;cursor:pointer}
+.specbar #spec-title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:.85rem;font-weight:600}
+.bar-actions{display:flex;align-items:center;gap:.3rem;flex:0 0 auto}
+.x{background:transparent;border:0;color:var(--muted);font-size:1rem;cursor:pointer;line-height:1}
 .x:hover{color:var(--accent)}
+.copy{display:inline-flex;align-items:center;gap:.3rem;background:transparent;border:1px solid var(--line);
+  border-radius:6px;color:var(--muted);font-size:.78rem;cursor:pointer;padding:.22rem .5rem;line-height:1.2}
+.copy:hover{border-color:var(--accent);color:var(--accent-dk)}
+.copy.ok{border-color:var(--green);color:var(--green-dk)}
+.copy .ico{font-size:.95rem}
 dialog#spec pre{padding:1rem;overflow:auto;white-space:pre-wrap;
   font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:0;
-  height:calc(100% - 42px);background:var(--card);color:var(--ink)}
+  flex:1 1 auto;min-height:0;background:var(--card);color:var(--ink)}
 @media (max-width:600px){
+  dialog#spec{width:96vw;height:88vh}
+  .copy .lbl{display:none}
+  .copy,.x{min-height:34px;min-width:34px;justify-content:center;padding:.2rem .4rem}
   main{padding:.6rem}
   .brand h1{font-size:.95rem}
   .tab{padding:.4rem .7rem;font-size:.8rem}
