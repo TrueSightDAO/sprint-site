@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TrueSight DAO — Sprint Board</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>TrueSight DAO · Sprint Board</h1>
+  </div>
+  <nav class="viewswitch" role="tablist" aria-label="View">
+    <button id="tab-needs" class="tab active" role="tab" aria-selected="true">Needs You</button>
+    <button id="tab-board" class="tab" role="tab" aria-selected="false">Full Board</button>
+  </nav>
+</header>
+
+<main>
+  <p id="meta" class="meta">Loading…</p>
+  <div id="allclear" class="allclear" hidden>
+    <div class="check">✓</div>
+    <h2>Nothing is blocked on you</h2>
+    <p>No tickets are <code>blocked_on_human</code> or <code>human_uat_ready</code> — everything is moving.</p>
+  </div>
+  <section id="needs" class="view"></section>
+  <section id="board" class="board view" hidden></section>
+  <footer id="done" class="donefoot"></footer>
+</main>
+
+<dialog id="spec">
+  <div class="specbar">
+    <span id="spec-title">Spec</span>
+    <form method="dialog"><button class="x" aria-label="Close">✕</button></form>
+  </div>
+  <pre id="spec-body">Loading…</pre>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

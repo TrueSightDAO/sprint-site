@@ -1,0 +1,149 @@
+"use strict";
+const REPO = "TrueSightDAO/agentic_ai_context";
+const REF = "main";
+const SOURCES = [
+  `https://cdn.jsdelivr.net/gh/${REPO}@${REF}/handoffs/index.json`,
+  `https://raw.githubusercontent.com/${REPO}/${REF}/handoffs/index.json`,
+];
+const SPEC_SOURCES = (p) => [
+  `https://cdn.jsdelivr.net/gh/${REPO}@${REF}/${p}`,
+  `https://raw.githubusercontent.com/${REPO}/${REF}/${p}`,
+];
+const TG_CHAT = "3919341801";               // t.me/c/<chat>/<thread>
+const DC_GUILD = "923008087315587072";      // discord.com/channels/<guild>/<channel>
+
+// Column layout maps DIRECTLY onto SUPERVISOR_LOOP.md §2's state enum.
+const COLUMNS = [
+  { key: "awaiting_kickoff", label: "Awaiting kickoff", states: ["awaiting_kickoff"] },
+  { key: "executing", label: "Executing", states: ["executing"] },
+  { key: "paused", label: "Paused at gate", states: ["paused_at_gate"] },
+  { key: "uat", label: "UAT (R1/R2)", states: ["sophia_uat", "envoy_uat"] },
+  { key: "need", label: "Needs You", states: ["blocked_on_human", "human_uat_ready"], need: true },
+];
+const FOOTER_STATES = ["done", "stale", "failed"];
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const strip = (s) => String(s ?? "").replace(/^[`*_#\s]+|[`*_\s]+$/g, "").replace(/\*\*/g, "");
+
+function planPath(h) {
+  // plan_file arrives backtick-wrapped: `plans/FOO.md`
+  return strip(h.plan_file || "");
+}
+function tgUrl(h) {
+  if (h.telegram_topic_url) return h.telegram_topic_url;
+  if (h.telegram_thread_id) return `https://t.me/c/${TG_CHAT}/${h.telegram_thread_id}`;
+  return null;
+}
+function dcUrl(h) {
+  if (h.discord_channel_id) {
+    const c = h.discord_channel_id;
+    const t = h.discord_thread_id;
+    return `https://discord.com/channels/${DC_GUILD}/${c}${t ? "/" + t : ""}`;
+  }
+  return null;
+}
+
+function card(h) {
+  const need = h.state === "blocked_on_human" || h.state === "human_uat_ready";
+  const links = [];
+  const pp = planPath(h);
+  if (pp) links.push(`<a href="#" class="spec" data-spec="${esc(pp)}">Spec</a>`);
+  const tg = tgUrl(h);
+  if (tg) links.push(`<a href="${esc(tg)}" target="_blank" rel="noopener">Telegram ↗</a>`);
+  const dc = dcUrl(h);
+  if (dc) links.push(`<a href="${esc(dc)}" target="_blank" rel="noopener">Discord ↗</a>`);
+  return `<article class="card${need ? " need" : ""}">
+    <div class="state">${esc(h.state)}</div>
+    <h3>${esc(strip(h.title))}</h3>
+    <div class="why">${esc(strip(h.status_raw))}</div>
+    <div class="links">${links.join("")}</div>
+    <div class="date">Updated ${esc(h.last_updated || "—")}</div>
+  </article>`;
+}
+
+function render(data) {
+  const hs = data.handoffs || [];
+  const byState = (s) => hs.filter((h) => h.state === s);
+  const needCards = [...byState("blocked_on_human"), ...byState("human_uat_ready")];
+
+  document.getElementById("meta").textContent =
+    `${hs.length} handoffs · ${needCards.length} need you · updated ${data.generated_at || "?"}`;
+
+  const ac = document.getElementById("allclear");
+  ac.hidden = needCards.length !== 0;
+
+  document.getElementById("needs").innerHTML =
+    needCards.map(card).join("");
+
+  const board = document.getElementById("board");
+  board.innerHTML = COLUMNS.map((col) => {
+    const cards = col.states.flatMap(byState);
+    return `<section class="col${col.need ? " need" : ""}">
+      <h2>${esc(col.label)} <span class="n">${cards.length}</span></h2>
+      ${cards.map(card).join("") || '<div class="why">—</div>'}
+    </section>`;
+  }).join("");
+
+  const foot = hs.filter((h) => FOOTER_STATES.includes(h.state));
+  document.getElementById("done").innerHTML = foot.length
+    ? `<details><summary>${foot.length} closed / stale (done · superseded · stale)</summary>
+        <ul>${foot.map((h) => `<li>${esc(strip(h.title))} — <em>${esc(h.state)}</em></li>`).join("")}</ul>
+       </details>`
+    : "";
+}
+
+function show(which) {
+  const needs = which === "needs";
+  document.getElementById("needs").hidden = !needs;
+  document.getElementById("board").hidden = needs;
+  document.getElementById("allclear").hidden = !needs || !document.getElementById("allclear").dataset.empty;
+  document.getElementById("tab-needs").classList.toggle("active", needs);
+  document.getElementById("tab-board").classList.toggle("active", !needs);
+  document.getElementById("tab-needs").setAttribute("aria-selected", needs);
+  document.getElementById("tab-board").setAttribute("aria-selected", !needs);
+}
+
+async function fetchFirst(urls) {
+  let lastErr;
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { cache: "no-store" });
+      if (r.ok) return await r.text();
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("all sources failed");
+}
+
+async function openSpec(path) {
+  const dlg = document.getElementById("spec");
+  document.getElementById("spec-title").textContent = path;
+  document.getElementById("spec-body").textContent = "Loading…";
+  dlg.showModal();
+  try {
+    document.getElementById("spec-body").textContent = await fetchFirst(SPEC_SOURCES(path));
+  } catch (e) {
+    document.getElementById("spec-body").textContent = "Could not load spec: " + e.message;
+  }
+}
+
+document.addEventListener("click", (ev) => {
+  const a = ev.target.closest("[data-spec]");
+  if (a) { ev.preventDefault(); openSpec(a.dataset.spec); }
+});
+document.getElementById("tab-needs").addEventListener("click", () => show("needs"));
+document.getElementById("tab-board").addEventListener("click", () => show("board"));
+
+(async () => {
+  try {
+    const txt = await fetchFirst(SOURCES);
+    const data = JSON.parse(txt);
+    const empty = !(data.handoffs || []).some(
+      (h) => h.state === "blocked_on_human" || h.state === "human_uat_ready");
+    document.getElementById("allclear").dataset.empty = empty ? "1" : "";
+    render(data);
+    show("needs"); // default landing view is "Needs You"
+  } catch (e) {
+    document.getElementById("meta").textContent = "Failed to load index.json: " + e.message;
+  }
+})();
