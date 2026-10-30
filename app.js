@@ -12,6 +12,15 @@ const SPEC_SOURCES = (p) => [
 const TG_CHAT = "3919341801";               // t.me/c/<chat>/<thread>
 const DC_GUILD = "923008087315587072";      // discord.com/channels/<guild>/<channel>
 
+// Sophia's public live-introspection endpoint. index.json above is a STATIC file built
+// periodically, so it can show handoff states but never what a worker is doing right now --
+// and its `supervised_by.stale` flag is frozen at build time. This endpoint reads shared
+// Redis instead. Read-only and public by design: the payload is allowlist-projected
+// server-side (no instruction text, no tool arguments, no session identities).
+const LIVE_STATE_URL = "https://sophia.truesight.me/live-state";
+const LIVE_POLL_MS = 5000;
+let liveTimer = null;
+
 // Column layout maps DIRECTLY onto SUPERVISOR_LOOP.md §2's state enum.
 const COLUMNS = [
   { key: "awaiting_kickoff", label: "Awaiting kickoff", states: ["awaiting_kickoff"] },
@@ -132,7 +141,136 @@ function render(data) {
     : "";
 }
 
-const VIEWS = { needs: "needs", board: "board", sup: "supervised" };
+// --- Live worker state ---------------------------------------------------------
+// Three conditions must never be conflated: switched off, unreachable, and genuinely
+// idle. A live panel that renders a dead endpoint as an empty board is worse than none.
+function fmtSpan(sec) {
+  const s = Number(sec);
+  if (!Number.isFinite(s) || s < 0) return "";
+  if (s < 90) return `${Math.round(s)}s`;
+  const m = Math.floor(s / 60);
+  if (m < 90) return `${m}m ${Math.round(s % 60)}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function fmtAgo(epochSec) {
+  const t = Number(epochSec);
+  if (!Number.isFinite(t)) return "";
+  return fmtSpan(Math.max(0, Date.now() / 1000 - t));
+}
+
+function liveSessionCard(s, i) {
+  const tool = s && s.current_tool ? String(s.current_tool) : "(idle)";
+  const done = Array.isArray(s && s.done) ? s.done.filter(Boolean).slice(-6) : [];
+  const chain = done.length
+    ? `<div class="why">${done.map((d) => esc(strip(String(d)))).join(" \u2192 ")}</div>`
+    : "";
+  const bits = [];
+  if (s && s.round != null) bits.push(`round ${esc(s.round)}`);
+  const el = fmtSpan(s && s.elapsed);
+  if (el) bits.push(`${esc(el)} elapsed`);
+  const ago = fmtAgo(s && s.started_at);
+  if (ago) bits.push(`started ${esc(ago)} ago`);
+  return `<article class="card">
+    <div class="state">working</div>
+    <h3>Worker ${i + 1} \u2014 ${esc(tool)}</h3>
+    ${chain}
+    <div class="date">${bits.join(" \u00b7 ") || "\u2014"}</div>
+  </article>`;
+}
+
+function liveClaimCard(c) {
+  const plan = strip((c && c.plan_file) || "(no plan file)");
+  const who = c && c.supervisor ? String(c.supervisor).split("(")[0].trim() : "unknown";
+  const note = c && c.note ? ` title="${esc(c.note)}"` : "";
+  const age = c && c.claimed_at ? fmtAgo(Date.parse(c.claimed_at) / 1000) : "";
+  return `<article class="card">
+    <div class="state">claimed</div>
+    <h3>${esc(plan)}</h3>
+    <div class="why"${note}>${esc(who)}${age ? ` \u00b7 ${esc(age)} ago` : ""}</div>
+  </article>`;
+}
+
+function renderLive(d) {
+  const meta = document.getElementById("live-meta");
+  const body = document.getElementById("live-body");
+
+  // Switched off: the endpoint answered correctly and said so. Say that, rather
+  // than showing an empty board that reads as "nothing is running".
+  if (!d || d.enabled !== true) {
+    meta.textContent = "Live worker state \u2014 switched off";
+    const why = (d && d.reason) || "LIVE_STATE_PUBLIC is off.";
+    body.innerHTML = `<div class="allclear"><div class="check">\u25CB</div>
+      <h2>Live state is switched off</h2>
+      <p>${esc(why)}</p>
+      <p>This is a configuration flag, not a fault \u2014 the endpoint answered correctly.</p>
+    </div>`;
+    return;
+  }
+
+  const sessions = Array.isArray(d.sessions) ? d.sessions : [];
+  const claims = Array.isArray(d.active_claims) ? d.active_claims : [];
+  const degraded = Array.isArray(d.degraded) ? d.degraded : [];
+
+  meta.textContent =
+    `${sessions.length} worker${sessions.length === 1 ? "" : "s"} in flight \u00b7 ` +
+    `${claims.length} open claim${claims.length === 1 ? "" : "s"} \u00b7 ` +
+    `${d.shared_state ? "shared Redis" : "per-process state"} \u00b7 ` +
+    `as of ${d.generated_at || "?"}`;
+
+  const warn = degraded.length
+    ? `<div class="allclear"><div class="check">!</div>
+        <h2>Partially degraded</h2>
+        <p>Some sections could not be read: ${esc(degraded.join(", "))}.</p>
+      </div>`
+    : "";
+
+  const sessLane = `<section class="col">
+    <h2>Working right now <span class="n">${sessions.length}</span></h2>
+    ${sessions.map(liveSessionCard).join("") ||
+      '<div class="why">No worker is mid-task \u2014 nothing is in flight.</div>'}
+  </section>`;
+
+  const claimLane = `<section class="col">
+    <h2>Open supervision claims <span class="n">${claims.length}</span></h2>
+    ${claims.map(liveClaimCard).join("") || '<div class="why">No open claims.</div>'}
+  </section>`;
+
+  body.innerHTML = warn + sessLane + claimLane;
+}
+
+async function loadLive() {
+  const meta = document.getElementById("live-meta");
+  const body = document.getElementById("live-body");
+  try {
+    const r = await fetch(LIVE_STATE_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    renderLive(await r.json());
+  } catch (e) {
+    // Unreachable says nothing about whether workers are busy -- only that the
+    // board could not ask. Never render this as an empty board.
+    meta.textContent = "Live worker state \u2014 unreachable";
+    body.innerHTML = `<div class="allclear"><div class="check">\u26A0</div>
+      <h2>Live state unreachable</h2>
+      <p>Could not reach <code>${esc(LIVE_STATE_URL)}</code> \u2014 ${esc(e.message)}.</p>
+      <p>This says nothing about whether work is happening; it only means the board
+      could not ask. The other tabs read a cached file and still work.</p>
+    </div>`;
+  }
+}
+
+function stopLivePoll() {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+}
+
+function startLivePoll() {
+  stopLivePoll();
+  liveTimer = setInterval(() => {
+    if (!document.getElementById("live").hidden) loadLive();
+  }, LIVE_POLL_MS);
+}
+
+const VIEWS = { needs: "needs", board: "board", sup: "supervised", live: "live" };
 
 function show(which, opts = {}) {
   if (!VIEWS[which]) which = "needs";
@@ -142,6 +280,9 @@ function show(which, opts = {}) {
     const tab = document.getElementById("tab-" + key);
     if (tab) { tab.classList.toggle("active", on); tab.setAttribute("aria-selected", on); }
   }
+  // Poll only while the Live tab is actually visible: a background board left open
+  // on another tab should not hammer the endpoint every 5s.
+  if (which === "live") { loadLive(); startLivePoll(); } else { stopLivePoll(); }
   // The all-clear replaces the Needs-You list only when there is nothing to show.
   document.getElementById("allclear").hidden =
     which !== "needs" || !document.getElementById("allclear").dataset.empty;
@@ -273,6 +414,7 @@ document.getElementById("copy-link").addEventListener("click", async (ev) => {
 document.getElementById("tab-needs").addEventListener("click", () => show("needs"));
 document.getElementById("tab-board").addEventListener("click", () => show("board"));
 document.getElementById("tab-sup").addEventListener("click", () => show("sup"));
+document.getElementById("tab-live").addEventListener("click", () => show("live"));
 
 (async () => {
   try {
