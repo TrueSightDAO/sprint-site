@@ -53,6 +53,33 @@ function dcUrl(h) {
   return null;
 }
 
+// Live claim records (active_supervision.json) carry only plan_file/supervisor/
+// claimed_at/note -- no thread ids. index.json, already fetched for the lanes,
+// does carry telegram_topic_url / discord_channel_id. Join the two so a claim
+// can link back to where the work actually happens.
+const planKey = (p) =>
+  strip(p || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+let PLAN_INDEX = new Map();
+
+function indexHandoffs(hs) {
+  const idx = new Map();
+  for (const h of hs || []) {
+    const k = planKey(h.plan_file);
+    if (!k) continue;
+    const cur = idx.get(k);
+    // Prefer the entry that actually has somewhere to go.
+    if (!cur || (!(tgUrl(cur) || dcUrl(cur)) && (tgUrl(h) || dcUrl(h)))) {
+      idx.set(k, h);
+    }
+  }
+  return idx;
+}
+
+function handoffFor(planFile) {
+  return PLAN_INDEX.get(planKey(planFile)) || null;
+}
+
 function supBadge(h) {
   const s = h.supervised_by;
   if (!s) return "";
@@ -76,8 +103,8 @@ function card(h) {
   return `<article class="card${need ? " need" : ""}">
     <div class="state">${esc(h.state)}</div>
     ${supBadge(h)}
-    <h3>${esc(strip(h.title))}</h3>
-    <div class="why">${esc(strip(h.status_raw))}</div>
+    <h3 class="wrap">${esc(strip(h.title))}</h3>
+    <div class="why wrap">${esc(strip(h.status_raw))}</div>
     <div class="links">${links.join("")}</div>
     <div class="date">Updated ${esc(h.last_updated || "—")}</div>
   </article>`;
@@ -85,6 +112,7 @@ function card(h) {
 
 function render(data) {
   const hs = data.handoffs || [];
+  PLAN_INDEX = indexHandoffs(hs);
   const byState = (s) => hs.filter((h) => h.state === s);
   const needCards = [...byState("blocked_on_human"), ...byState("human_uat_ready")];
 
@@ -184,10 +212,21 @@ function liveClaimCard(c) {
   const who = c && c.supervisor ? String(c.supervisor).split("(")[0].trim() : "unknown";
   const note = c && c.note ? ` title="${esc(c.note)}"` : "";
   const age = c && c.claimed_at ? fmtAgo(Date.parse(c.claimed_at) / 1000) : "";
+  const links = [];
+  const h = handoffFor(c && c.plan_file);
+  if (h) {
+    const pp = planPath(h);
+    if (pp) links.push(`<a href="#" class="spec" data-spec="${esc(pp)}">Spec</a>`);
+    const tg = tgUrl(h);
+    if (tg) links.push(`<a href="${esc(tg)}" target="_blank" rel="noopener">Telegram \u2197</a>`);
+    const dc = dcUrl(h);
+    if (dc) links.push(`<a href="${esc(dc)}" target="_blank" rel="noopener">Discord \u2197</a>`);
+  }
   return `<article class="card">
     <div class="state">claimed</div>
-    <h3>${esc(plan)}</h3>
-    <div class="why"${note}>${esc(who)}${age ? ` \u00b7 ${esc(age)} ago` : ""}</div>
+    <h3 class="wrap">${esc(plan)}</h3>
+    <div class="why wrap"${note}>${esc(who)}${age ? ` \u00b7 ${esc(age)} ago` : ""}</div>
+    ${links.length ? `<div class="links">${links.join("")}</div>` : ""}
   </article>`;
 }
 
