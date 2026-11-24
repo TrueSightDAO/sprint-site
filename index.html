@@ -3,57 +3,64 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="TrueSight DAO sprint board — a read-only view of active handoffs and what needs a human." />
-<title>TrueSight DAO — Sprint Board</title>
-<!-- Favicon: same asset dapp/index.html uses -->
-<link rel="icon" type="image/png" href="https://github.com/TrueSightDAO/.github/blob/main/assets/20240612_truesight_dao_logo_square.png?raw=true" />
-<link rel="stylesheet" href="styles.css" />
+<title>Retired — TrueSight DAO board has moved to Jira</title>
+<meta name="description" content="This sprint board has been retired. The live board is the Jira KAN board." />
+<meta name="robots" content="noindex, nofollow" />
+<!-- Redirect FIRST, before anything can fail to load. Zero external dependencies. -->
+<meta http-equiv="refresh" content="0; url=https://truesightdao.atlassian.net/jira/software/projects/KAN/boards/2" />
+<link rel="canonical" href="https://truesightdao.atlassian.net/jira/software/projects/KAN/boards/2" />
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #faf7f2; color: #2b2118; padding: 2rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1b1712; color: #f0e9e0; }
+    .card { background: #241f19; border-color: #3a3229; }
+    a.btn { background: #d99a2b; color: #1b1712; }
+    code { background: #2e2820; }
+  }
+  .card {
+    max-width: 34rem; background: #fff; border: 1px solid #e6ddd0; border-radius: 10px;
+    padding: 2rem 2.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  .sub { margin: 0 0 1.5rem; font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
+  p { margin: 0 0 1rem; }
+  a.btn {
+    display: inline-block; margin: .5rem 0 1.25rem; padding: .7rem 1.3rem;
+    background: #b5751a; color: #fff; text-decoration: none; border-radius: 6px;
+    font-weight: 600; font-size: .95rem;
+  }
+  a.btn:hover { filter: brightness(1.08); }
+  .fine { font-size: .82rem; opacity: .72; }
+  code { background: #f3ece2; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+</style>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <img class="brand-logo" src="https://github.com/TrueSightDAO/.github/blob/main/assets/20240612_truesight_dao_logo_square.png?raw=true" alt="TrueSight DAO" />
-    <h1>TrueSight DAO · Sprint Board</h1>
-  </div>
-  <nav class="viewswitch" role="tablist" aria-label="View">
-    <button id="tab-needs" class="tab active" role="tab" aria-selected="true">Needs You</button>
-    <button id="tab-board" class="tab" role="tab" aria-selected="false">Full Board</button>
-    <button id="tab-sup" class="tab" role="tab" aria-selected="false">&#x1F440; Envoy supervised</button>
-    <button id="tab-live" class="tab" role="tab" aria-selected="false">&#x1F4E1; Live</button>
-  </nav>
-</header>
+  <main class="card">
+    <h1>This board has been retired</h1>
+    <p class="sub">sprint.truesight.me &rarr; Jira KAN</p>
 
-<main>
-  <p id="meta" class="meta">Loading…</p>
-  <div id="allclear" class="allclear" hidden>
-    <div class="check">✓</div>
-    <h2>Nothing is blocked on you</h2>
-    <p>No tickets are <code>blocked_on_human</code> or <code>human_uat_ready</code> — everything is moving.</p>
-  </div>
-  <section id="needs" class="view"></section>
-  <section id="board" class="board view" hidden></section>
-  <section id="supervised" class="board view" hidden></section>
-  <section id="live" class="view" hidden>
-    <p id="live-meta" class="meta"></p>
-    <div id="live-body" class="board"></div>
-  </section>
-  <footer id="done" class="donefoot"></footer>
-</main>
+    <p><strong>All work now lives on the Jira KAN board.</strong>
+       You are being redirected automatically.</p>
 
-<dialog id="spec">
-  <div class="specbar">
-    <span id="spec-title">Spec</span>
-    <div class="bar-actions">
-      <button id="copy-link" class="copy" type="button"
-              aria-label="Copy a link to this spec" title="Copy a link to this spec">
-        <span class="ico" aria-hidden="true">&#x29C9;</span><span class="lbl">Copy URL</span>
-      </button>
-      <form method="dialog"><button class="x" aria-label="Close">&#x2715;</button></form>
-    </div>
-  </div>
-  <pre id="spec-body">Loading&#x2026;</pre>
-</dialog>
+    <a class="btn" href="https://truesightdao.atlassian.net/jira/software/projects/KAN/boards/2">
+      Open the Jira KAN board &rarr;
+    </a>
 
-<script src="app.js"></script>
+    <p class="fine">
+      Retired 2026-11-25. All 57 active handoffs were migrated as KAN tickets;
+      34 already-completed ones were not. The board was retired because it was read-only and
+      could not express per-ticket stage or ownership — Jira does both.
+    </p>
+    <p class="fine">
+      Still reading <code>handoffs/index.json</code>? It is unchanged and still authoritative
+      for the supervisor loop; only this <em>view</em> was retired. Conventions:
+      <code>agentic_ai_context/JIRA_WORKFLOW_SOP.md</code>.
+    </p>
+  </main>
 </body>
 </html>
